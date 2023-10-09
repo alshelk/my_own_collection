@@ -1,0 +1,5 @@
+---
+# vars file for vector-role
+vector_config_dir: "/etc/vector"
+temp_dir: "/tmp/vector"
+
