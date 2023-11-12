@@ -27,7 +27,7 @@
       my_own_collection.yandex_cloud_elk.yc_create_vm:
         step: "vm"
         folder_id: "{{ folder_id }}"
-        vm_name: "clickhouse"
+        vm_name: "clickhouse-01"
         subnetname: "learning-subnet"
         imgfamily: "centos-7"
         disksize: "20GB"
@@ -38,16 +38,14 @@
       register: clickhouse_output
 #    - name: print facts
 #      debug:
-#        var: find_hosts_output
-    - name: print facts
-      debug:
-        var: clickhouse_output.message[0].primary_v4_address.one_to_one_nat.address
+#        var: clickhouse_output.message[0].primary_v4_address.one_to_one_nat.address
     - name: Add host to group 'clickhouse'
       ansible.builtin.add_host:
-        name: '{{ clickhouse_output.message[0].primary_v4_address.one_to_one_nat.address }}'
+        name: clickhouse-01
         groups: clickhouse
-        hosts: clickhouse-01
+        ansible_host: '{{ clickhouse_output.message[0].primary_v4_address.one_to_one_nat.address }}'
         ansible_user: yc-user
+        primary_v4_address: '{{ clickhouse_output.message[0].primary_v4_address.address }}'
     - name: yc create vm2
       my_own_collection.yandex_cloud_elk.yc_create_vm:
         step: "vm"
@@ -63,14 +61,16 @@
       register: lighthouse_output
     - name: Add host to group 'lighthouse'
       ansible.builtin.add_host:
-        name: '{{ lighthouse_output.message[0].primary_v4_address.one_to_one_nat.address }}'
+        name: lighthouse-01
         groups: lighthouse
+        ansible_host: '{{ lighthouse_output.message[0].primary_v4_address.one_to_one_nat.address }}'
         ansible_user: yc-user
+        primary_v4_address: '{{ lighthouse_output.message[0].primary_v4_address.address }}'
     - name: yc create vm2
       my_own_collection.yandex_cloud_elk.yc_create_vm:
         step: "vm"
         folder_id: "{{ folder_id }}"
-        vm_name: "vector"
+        vm_name: "vector-01"
         subnetname: "learning-subnet"
         imgfamily: "centos-7"
         disksize: "20GB"
@@ -81,83 +81,103 @@
       register: vector_output
     - name: Add host to group 'vector'
       ansible.builtin.add_host:
-        name: '{{ vector_output.message[0].primary_v4_address.one_to_one_nat.address }}'
+        name: vector-01
         groups: vector
-        hosts: vectore-01
+        ansible_host: '{{ vector_output.message[0].primary_v4_address.one_to_one_nat.address }}'
         ansible_user: yc-user
+        primary_v4_address: '{{ vector_output.message[0].primary_v4_address.address }}'
 
-- tasks:
-  - name: print facts
-    debug:
-      var: clickhouse
+##- tasks:
+#- hosts: clickhouse-01
+#  tasks:
+#    - name: show inventory_hostname
+#      command: echo {{ inventory_hostname }}
+#- hosts: localhost
+#  tasks:
+##    - name: print facts 1
+##      debug:
+##        var: inventory_hostname
+#    - name: print facts 2
+#      debug:
+#        var: hostvars
+#    - name: print facts 3
+#      debug:
+#        var: hostvars[ 'clickhouse-01' ].hosts.ansible_host
+#    - name: print facts 4
+#      debug:
+#        var: groups
 
-#- name: Install Clickhouse
-#  hosts: clickhouse
-#  gather_facts: no
-#  vars:
-#    clickhouse_listen_host_custom:
-#      - "{{ hostvars[ 'clickhouse-01' ].ansible_default_ipv4.address }}"
-#    clickhouse_dbs_custom:
-#      - { name: logs }
-#  pre_tasks:
-#    - name: Wait 300 seconds, but only start checking after 60 seconds
-#      ansible.builtin.wait_for_connection:
-#        delay: 60
-#        timeout: 300
-#    - name: Gather facts for first time
-#      ansible.builtin.setup:
-#  roles:
-#    - role: clickhouse
-#  post_tasks:
-#    - name: Create table
-#      ansible.builtin.command: "clickhouse-client -q 'CREATE TABLE IF NOT EXISTS logs.local_log
-#        (file String, hostname String, message String, timestamp DateTime) Engine=Log;'"
-#      register: create_table
-#      failed_when: create_table.rc != 0 and create_table.rc !=57
-#      changed_when: create_table.rc == 0
-#      when: not ansible_check_mode
-#
-#- name: Install Vector manual
-#  hosts: vector
-#  gather_facts: no
-#  vars:
-#    ip_clickhouse: "{{ hostvars[ 'clickhouse-01' ].ansible_default_ipv4.address }}"
-#  collections:
-#    - my_own_collection.yandex_cloud_elk
-#  pre_tasks:
-#    - name: Wait 300 seconds, but only start checking after 60 seconds
-#      ansible.builtin.wait_for_connection:
-#        delay: 60
-#        timeout: 300
-#    - name: Gather facts for first time
-#      ansible.builtin.setup:
-#  tasks:
-#    - name: import role vector
-#      ansible.builtin.import_role:
-#        name: vector-role
-#
-#- name: Install lighthouse
-#  hosts: lighthouse
-#  gather_facts: no
-#  collections:
-#    - my_own_collection.yandex_cloud_elk
-#  pre_tasks:
-#    - name: Wait 300 seconds, but only start checking after 60 seconds
-#      ansible.builtin.wait_for_connection:
-#        delay: 60
-#        timeout: 300
-#    - name: Gather facts for first time
-#      ansible.builtin.setup:
-#    - name: install git
-#      ansible.builtin.yum:
-#        name: git
-#        state: latest
-#        update_cache: yes
-#      become: true
-#  tasks:
-#    - name: import role nginx
-#      ansible.builtin.import_role:
-#        name: nginx-role
-#    - name: import role lighthouse
-#      ansible.builtin.import_role:
-#        name: lighthouse-role
+
+- name: Install Clickhouse
+  hosts: clickhouse
+  gather_facts: no
+  vars:
+    clickhouse_listen_host_custom:
+      - "{{ hostvars[ 'clickhouse-01' ].primary_v4_address }}"
+    clickhouse_dbs_custom:
+      - { name: logs }
+  pre_tasks:
+    - name: wait until clickhouse server is up
+      wait_for:
+        port: 22
+        host: "{{ hostvars[ 'clickhouse-01' ].ansible_host }}"
+      delegate_to: localhost
+    - name: Gather facts for first time
+      ansible.builtin.setup:
+  roles:
+    - role: clickhouse
+  post_tasks:
+    - name: Create table
+      ansible.builtin.command: "clickhouse-client -q 'CREATE TABLE IF NOT EXISTS logs.local_log
+        (file String, hostname String, message String, timestamp DateTime) Engine=Log;'"
+      register: create_table
+      failed_when: create_table.rc != 0 and create_table.rc !=57
+      changed_when: create_table.rc == 0
+      when: not ansible_check_mode
+
+- name: Install Vector manual
+  hosts: vector
+  gather_facts: no
+  vars:
+    ip_clickhouse: "{{ hostvars[ 'clickhouse-01' ].primary_v4_address }}"
+  collections:
+    - my_own_collection.yandex_cloud_elk
+  pre_tasks:
+    - name: wait until vector server is up
+      wait_for:
+        port: 22
+        host: "{{ hostvars[ 'vector-01' ].ansible_host }}"
+      delegate_to: localhost
+    - name: Gather facts for first time
+      ansible.builtin.setup:
+  tasks:
+    - name: import role vector
+      ansible.builtin.import_role:
+        name: vector-role
+
+- name: Install lighthouse
+  hosts: lighthouse
+  gather_facts: no
+  collections:
+    - my_own_collection.yandex_cloud_elk
+  pre_tasks:
+    - name: wait until lighthouse server is up
+      wait_for:
+        port: 22
+        host: "{{ hostvars[ 'lighthouse-01' ].ansible_host }}"
+      delegate_to: localhost
+    - name: Gather facts for first time
+      ansible.builtin.setup:
+    - name: install git
+      ansible.builtin.yum:
+        name: git
+        state: latest
+        update_cache: yes
+      become: true
+  tasks:
+    - name: import role nginx
+      ansible.builtin.import_role:
+        name: nginx-role
+    - name: import role lighthouse
+      ansible.builtin.import_role:
+        name: lighthouse-role
