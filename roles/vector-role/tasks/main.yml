@@ -49,12 +49,12 @@
       path: "{{ vector_config.data_dir }}"
       state: directory
   become: true
-- name: Start clickhouse service
-  become: true
-  ansible.builtin.service:
-    name: clickhouse-server
-    state: restarted
-  when: not ansible_check_mode
+#- name: Start clickhouse service
+#  become: true
+#  ansible.builtin.service:
+#    name: clickhouse-server
+#    state: restarted
+#  when: not ansible_check_mode
   notify: restarted vector service
 - name: Flush handlers
   meta: flush_handlers

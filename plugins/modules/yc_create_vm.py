@@ -72,6 +72,7 @@ message:
 import os, subprocess, json
 from ansible.module_utils.basic import AnsibleModule
 
+
 def check_dependency(method):
     if method == "cli":
         try:
@@ -173,21 +174,20 @@ def run_module():
         supports_check_mode=True
     )
 
-
-    match module.params['step']:
-        case "auth":
+    # for python 3.9
+    if  module.params['step'] == "auth":
             res = check_dependency(module.params['method'])
             auth = yc_auth(module.params['method'], module.params['token'])
             result['message'] = '['+res+', '+auth+']'
             if "Installed" in res:
                 result['changed'] = True
-        case "network":
+    elif module.params['step'] == "network":
             netname = create_vpc_network(module.params['method'], module.params['folder_id'],
                                          module.params['networkname'],  module.params['netdesc'])
             result['message'] = netname
             if not "AlreadyExists" in netname:
                 result['changed'] = True
-        case "subnetwork":
+    elif module.params['step'] == "subnetwork":
             network_id = get_fact(module.params['method'],
                                 "yc vpc network list --folder-id {} --format json".format(module.params['folder_id']),
                                 module.params['networkname'], "id")
@@ -198,7 +198,7 @@ def run_module():
             result['message'] = subnet
             if not "ERROR" in subnet:
                 result['changed'] = True
-        case "vm":
+    elif module.params['step'] == "vm":
             vm = create_vm_instance(module.params['method'], module.params['vm_name'], module.params['zone'],
                                     module.params['subnetname'], module.params['imgfamily'], module.params['disksize'],
                                     module.params['ram'], module.params['cores'], module.params['frac'],
@@ -211,6 +211,44 @@ def run_module():
             result['message'] = vm_ip
             if not "AlreadyExists" in vm:
                 result['changed'] = True
+
+    # match module.params['step']:
+    #     case "auth":
+    #         res = check_dependency(module.params['method'])
+    #         auth = yc_auth(module.params['method'], module.params['token'])
+    #         result['message'] = '['+res+', '+auth+']'
+    #         if "Installed" in res:
+    #             result['changed'] = True
+    #     case "network":
+    #         netname = create_vpc_network(module.params['method'], module.params['folder_id'],
+    #                                      module.params['networkname'],  module.params['netdesc'])
+    #         result['message'] = netname
+    #         if not "AlreadyExists" in netname:
+    #             result['changed'] = True
+    #     case "subnetwork":
+    #         network_id = get_fact(module.params['method'],
+    #                             "yc vpc network list --folder-id {} --format json".format(module.params['folder_id']),
+    #                             module.params['networkname'], "id")
+    #
+    #         subnet = create_vpc_subnet(module.params['method'], module.params['subnetname'], module.params['subdesc'],
+    #                                    network_id, module.params['zone'], module.params['cidr'], module.params['folder_id'])
+    #
+    #         result['message'] = subnet
+    #         if not "ERROR" in subnet:
+    #             result['changed'] = True
+    #     case "vm":
+    #         vm = create_vm_instance(module.params['method'], module.params['vm_name'], module.params['zone'],
+    #                                 module.params['subnetname'], module.params['imgfamily'], module.params['disksize'],
+    #                                 module.params['ram'], module.params['cores'], module.params['frac'],
+    #                                 module.params['pathkey'], module.params['folder_id'])
+    #
+    #         vm_ip = get_fact(module.params['method'],
+    #                               "yc compute instance list --folder-id {} --format json".format(module.params['folder_id']),
+    #                               module.params['vm_name'], "network_interfaces")
+    #
+    #         result['message'] = vm_ip
+    #         if not "AlreadyExists" in vm:
+    #             result['changed'] = True
 
 
     # if the user is working with this module in only check mode we do not
